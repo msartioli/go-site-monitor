@@ -83,7 +83,7 @@ func testarSites(site string, status bool) {
 		registraLog(site, true)
 	} else {
 		fmt.Println("Site:", site, "esta com problemas. Status Code:", resp.StatusCode) // aqui mesma coisa
-		registraLog(site, false)                                                        // isso aqui e para passar pro log que vai nos imprimir caso esse site esteja ofline, mas não entendi muito bem, mas sei o que está acotnecendo
+		registraLog(site, false)                                                      
 	}
 }
 
@@ -108,7 +108,7 @@ func leArquivo() []string {
 	return sites
 }
 
-func registraLog(site string, status bool) { // como sempre nao entendi quando passar de fato as isntrução dentro dos () quando se abre uma função "site string, status bool"
+func registraLog(site string, status bool) {
 
 	arquivo, err := os.OpenFile("log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666) // usar o openfile que é uma versão mais poderosa do Open, nela ele passou os comando para criar arquivo se não existir escrever arquivos, e precisa da permisão, não sei por que tem que ser 0666 e quando usar se for outra
 
@@ -116,7 +116,7 @@ func registraLog(site string, status bool) { // como sempre nao entendi quando p
 		fmt.Println(err)
 	}
 
-	arquivo.WriteString(time.Now().Format("02/01/2006 15:04:05") + " - " + site + " - online: " + strconv.FormatBool(status) + "\n") // a hora não entendi muito bem, nao consegui decorar nada nem para que serve writeString mas entendi para pasasr os formatos que e bem simples e tem na documentação
+	arquivo.WriteString(time.Now().Format("02/01/2006 15:04:05") + " - " + site + " - online: " + strconv.FormatBool(status) + "\n")
 
 	arquivo.Close() // boas praticas
 }
