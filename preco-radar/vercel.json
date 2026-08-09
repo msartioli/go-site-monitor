@@ -1,9 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
-      "path": "/api/check-prices",
-      "schedule": "0 12 * * *"
-    }
-  ]
+  "framework": "nextjs",
+  "outputDirectory": null
 }
