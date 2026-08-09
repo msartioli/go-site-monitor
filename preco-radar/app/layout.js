@@ -1,5 +1,6 @@
 import './globals.css'
 import ProductImageHydrator from '../components/product-image-hydrator'
+import DashboardBehaviorEnhancer from '../components/dashboard-behavior-enhancer'
 
 export const metadata = {
   title: 'Preço Radar',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <ProductImageHydrator />
+        <DashboardBehaviorEnhancer />
       </body>
     </html>
   )
