@@ -1,0 +1,13 @@
+(()=>{
+const URL='https://sziaumkwyxodhtuaxlhg.supabase.co/functions/v1/dashboard-data';
+const $=s=>document.querySelector(s);
+const esc=(v='')=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dt=v=>v?new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(v)):'—';
+let coupons=[];
+function trustLabel(c){if(c.source_kind==='cart_verified')return{label:'Carrinho validado',cls:'cart'};if(c.source_kind==='official')return{label:'Fonte oficial',cls:''};return{label:'Validado manualmente',cls:''}}
+function modelName(c,products){const p=products.find(x=>x.group_key===c.group_key);return p?.group_name||c.model||'Produto monitorado'}
+function render(products){const active=coupons.filter(c=>c.status==='active').sort((a,b)=>new Date(b.verified_at||b.last_seen_at)-new Date(a.verified_at||a.last_seen_at));$('#couponBadge').textContent=active.length;const list=$('#couponList');if(!list)return;list.innerHTML='';$('#noCoupons').classList.toggle('hidden',active.length>0);for(const c of active){const t=trustLabel(c),card=document.createElement('article');card.className='coupon-card';card.innerHTML=`<div class="coupon-main"><div class="coupon-store">${esc(c.store)} <span class="trust-pill ${t.cls}">✓ ${t.label}</span></div><div class="coupon-name">${esc(c.title||'Cupom encontrado')}</div><div class="coupon-model"><span class="chip">${esc(c.model||'SKU monitorado')}</span><span class="coupon-empty-label">${esc(modelName(c,products))}</span></div></div><div class="coupon-code-wrap"><span>Código</span><div class="coupon-code"><code>${esc(c.code)}</code><button class="copy-coupon" type="button" data-copy-coupon="${esc(c.code)}">Copiar</button></div></div><div class="coupon-verified"><span>Última verificação</span><strong>${dt(c.verified_at||c.last_seen_at)}</strong><small>${esc(c.discount_text||'Condições conforme a loja')}</small></div><div class="coupon-actions"><a class="coupon-source" href="${esc(c.source_url)}" target="_blank" rel="noopener">Ver fonte oficial ↗</a></div>`;list.appendChild(card)}}
+async function loadCoupons(){try{const r=await fetch(URL+'?coupon='+Date.now(),{cache:'no-store'});if(!r.ok)return;const d=await r.json();coupons=d.coupons||[];render(d.products||[])}catch(_){}}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-copy-coupon]');if(!b)return;const code=b.dataset.copyCoupon;try{await navigator.clipboard.writeText(code);const old=b.textContent;b.textContent='Copiado!';setTimeout(()=>b.textContent=old,1500)}catch(_){prompt('Copie o cupom:',code)}});
+loadCoupons();setInterval(loadCoupons,60000);
+})();
