@@ -3,9 +3,9 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "predev": "node scripts/apply-dashboard-fixes.mjs && node scripts/apply-coupon-order-runtime-fix.mjs && node scripts/apply-coupon-product-match-fix.mjs && node scripts/apply-effective-target-fix.mjs",
+    "predev": "node scripts/apply-dashboard-fixes.mjs && node scripts/apply-coupon-order-runtime-fix.mjs && node scripts/apply-coupon-product-match-fix.mjs && node scripts/apply-effective-target-fix.mjs && node scripts/apply-offer-dedupe-fix.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/apply-dashboard-fixes.mjs && node scripts/apply-coupon-order-runtime-fix.mjs && node scripts/apply-coupon-product-match-fix.mjs && node scripts/apply-effective-target-fix.mjs",
+    "prebuild": "node scripts/apply-dashboard-fixes.mjs && node scripts/apply-coupon-order-runtime-fix.mjs && node scripts/apply-coupon-product-match-fix.mjs && node scripts/apply-effective-target-fix.mjs && node scripts/apply-offer-dedupe-fix.mjs",
     "build": "next build",
     "start": "next start"
   },
