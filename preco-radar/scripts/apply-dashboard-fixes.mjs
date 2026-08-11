@@ -154,6 +154,45 @@ function modelImage(group) {`,
   )
 }
 
+if (!source.includes('function couponSavingsEstimate(')) {
+  replaceOrThrow(
+    `function modelImage(group) {`,
+    `function couponSavingsEstimate(coupon, products) {
+  const text = String(coupon.validated_discount_text || coupon.discount_text || coupon.title || '')
+  const fixedMatch = text.match(/R\\$\\s*([0-9.]+(?:,[0-9]{1,2})?)/i)
+  const percentMatch = text.match(/([0-9]+(?:[.,][0-9]+)?)\\s*%/)
+  const fixed = fixedMatch ? parseMoney(fixedMatch[1]) : null
+  const percent = percentMatch ? Number(percentMatch[1].replace(',', '.')) : null
+
+  const live = (products || []).filter((product) => product.active && product.current_price != null && !product.last_error)
+  const groupSpecific = coupon.group_key && !String(coupon.group_key).startsWith('campaign:')
+  let relevant = groupSpecific ? live.filter((product) => product.group_key === coupon.group_key) : []
+
+  if (!relevant.length && coupon.store) {
+    const normalizedStore = String(coupon.store).toLowerCase().replace(/[^a-z0-9]/g, '')
+    relevant = live.filter((product) => String(product.store || '').toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedStore)
+  }
+
+  const prices = relevant.map((product) => Number(product.current_price)).filter((price) => Number.isFinite(price) && price > 0)
+  const referencePrice = prices.length ? (groupSpecific ? Math.min(...prices) : Math.max(...prices)) : null
+  const percentSavings = percent != null && referencePrice != null ? referencePrice * (percent / 100) : 0
+  const fixedSavings = fixed != null ? fixed : 0
+  const savings = Math.max(fixedSavings, percentSavings)
+
+  return {
+    savings,
+    referencePrice,
+    fixed,
+    percent,
+    estimated: !(coupon.status === 'active' && coupon.validation_status === 'cart_verified'),
+  }
+}
+
+function modelImage(group) {`,
+    'coupon savings helper',
+  )
+}
+
 if (!source.includes("coupon.status === 'candidate' &&")) {
   replaceOrThrow(
     `  const validCoupons = useMemo(
@@ -183,6 +222,9 @@ if (!source.includes("coupon.status === 'candidate' &&")) {
         )
       })
       .sort((a, b) => {
+        const aSavings = couponSavingsEstimate(a, data.products).savings
+        const bSavings = couponSavingsEstimate(b, data.products).savings
+        if (Math.abs(aSavings - bSavings) > 0.01) return bSavings - aSavings
         const aConfirmed = a.status === 'active' && a.validation_status === 'cart_verified' ? 0 : 1
         const bConfirmed = b.status === 'active' && b.validation_status === 'cart_verified' ? 0 : 1
         if (aConfirmed !== bConfirmed) return aConfirmed - bConfirmed
@@ -191,7 +233,7 @@ if (!source.includes("coupon.status === 'candidate' &&")) {
         if (aOfficial !== bOfficial) return aOfficial - bOfficial
         return new Date(b.last_seen_at || 0) - new Date(a.last_seen_at || 0)
       })
-  }, [data.coupons])`,
+  }, [data.coupons, data.products])`,
     'coupon visibility policy',
   )
 
@@ -209,26 +251,28 @@ if (!source.includes("coupon.status === 'candidate' &&")) {
         <div className="absolute inset-0 bg-gradient-to-r from-bg-primary via-bg-primary/90 to-transparent" />
         <div className="relative max-w-2xl">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-warning/20 bg-warning/[0.07] px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.14em] text-warning"><TicketPercent size={12}/> Radar de cupons</div>
-          <h1 className="text-3xl font-extrabold tracking-[-0.045em] sm:text-4xl">Cupom bom aparece. Cupom confirmado ganha prioridade.</h1>
-          <p className="mt-3 max-w-xl text-xs leading-6 text-text-secondary/80">Verde significa que o carrinho aceitou. Amarelo significa campanha oficial ou fonte recente confiável: vale testar, mas ainda pode depender do SKU, conta ou forma de pagamento.</p>
+          <h1 className="text-3xl font-extrabold tracking-[-0.045em] sm:text-4xl">Do maior desconto potencial para o menor.</h1>
+          <p className="mt-3 max-w-xl text-xs leading-6 text-text-secondary/80">A ordem considera a economia em reais nos produtos monitorados. Desconto percentual usa o preço ao vivo do produto/loja; desconto fixo usa o valor anunciado. Candidatos continuam marcados como estimativa até o carrinho confirmar.</p>
           <div className="mt-5 flex flex-wrap gap-2 text-[9px] font-bold"><span className="rounded-full bg-success/10 px-3 py-1.5 text-success">{confirmed.length} confirmado{confirmed.length === 1 ? '' : 's'}</span><span className="rounded-full bg-warning/10 px-3 py-1.5 text-warning">{candidates.length} para testar</span></div>
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {coupons.map((coupon) => {
+        {coupons.map((coupon, index) => {
           const isConfirmed = coupon.status === 'active' && coupon.validation_status === 'cart_verified'
           const isOfficial = coupon.source_kind === 'official'
           const label = isConfirmed ? '✓ Validado no carrinho' : isOfficial ? '★ Campanha oficial — testar' : '⚡ Encontrado recentemente — testar'
           const accent = isConfirmed ? 'text-success' : 'text-warning'
           const panel = isConfirmed ? 'border-success/15 bg-success/[0.025]' : 'border-warning/15 bg-warning/[0.025]'
+          const estimate = couponSavingsEstimate(coupon, window.__PRECO_RADAR_PRODUCTS__ || [])
           return (
             <article key={coupon.id} className={\`premium-card border \${panel} p-5\`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0"><p className={\`text-[9px] font-extrabold uppercase tracking-[0.12em] \${accent}\`}>{label}</p><h3 className="mt-2 line-clamp-2 text-base font-bold">{coupon.title || 'Cupom encontrado'}</h3><p className="mt-1 text-[10px] text-text-muted">{coupon.store} · {coupon.model || 'Produtos selecionados'}</p></div><TicketPercent className={accent} />
+                <div className="min-w-0"><div className="mb-1 flex items-center gap-2"><span className="grid h-6 min-w-6 place-items-center rounded-full bg-white/[0.07] px-1.5 text-[9px] font-extrabold text-text-secondary">#{index + 1}</span><p className={\`text-[9px] font-extrabold uppercase tracking-[0.12em] \${accent}\`}>{label}</p></div><h3 className="mt-2 line-clamp-2 text-base font-bold">{coupon.title || 'Cupom encontrado'}</h3><p className="mt-1 text-[10px] text-text-muted">{coupon.store} · {coupon.model || 'Produtos selecionados'}</p></div><TicketPercent className={accent} />
               </div>
               <div className="mt-5 flex items-center gap-2"><code className="flex-1 rounded-xl border border-dashed border-accent-primary/25 bg-accent-primary/[0.05] px-4 py-3 text-center text-lg font-black tracking-[0.12em] text-accent-primary">{coupon.code}</code><button onClick={async () => { try { await navigator.clipboard.writeText(coupon.code); setToast('Cupom copiado — teste no carrinho') } catch { setToast(\`Cupom: \${coupon.code}\`) } }} className="grid h-12 w-12 place-items-center rounded-xl border border-border-soft bg-white/[0.035] text-text-secondary"><Copy size={17}/></button></div>
-              <div className="mt-4 rounded-xl border border-border-soft bg-bg-primary/35 p-3"><p className="text-[10px] font-bold text-text-secondary">{coupon.validated_discount_text || coupon.discount_text || 'Condição promocional encontrada'}</p>{!isConfirmed ? <p className="mt-1.5 text-[9px] leading-4 text-text-muted">Ainda não conte com o desconto no preço final: abra a campanha/produto e teste o código no carrinho.</p> : null}</div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-border-soft bg-bg-primary/35 p-3"><p className="text-[8px] uppercase tracking-[0.08em] text-text-muted">Desconto anunciado</p><p className="mt-1 text-[11px] font-bold text-text-secondary">{coupon.validated_discount_text || coupon.discount_text || 'Condição promocional encontrada'}</p></div><div className="rounded-xl border border-accent-primary/15 bg-accent-primary/[0.045] p-3"><p className="text-[8px] uppercase tracking-[0.08em] text-text-muted">Economia potencial</p><p className="mt-1 text-base font-extrabold text-accent-primary">{estimate.savings > 0 ? money(estimate.savings) : '—'}</p><p className="mt-1 text-[8px] text-text-muted">{isConfirmed ? 'confirmada' : 'estimada; depende da elegibilidade'}</p></div></div>
+              {!isConfirmed ? <p className="mt-3 text-[9px] leading-4 text-text-muted">Ainda não conte com o desconto no preço final: abra a campanha/produto e teste o código no carrinho.</p> : null}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[9px] text-text-muted"><span>{isConfirmed ? \`validado \${dateTime(coupon.cart_verified_at)}\` : \`visto \${dateTime(coupon.last_seen_at)}\`}</span><span>{isOfficial ? 'fonte oficial' : 'fonte agregadora'}</span></div>
               {coupon.offer_url || coupon.source_url ? <a href={coupon.offer_url || coupon.source_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-[10px] font-bold text-accent-primary">{coupon.offer_url && coupon.offer_url !== coupon.source_url ? 'Abrir produto' : 'Abrir campanha'} <ExternalLink size={12}/></a> : null}
             </article>
@@ -243,5 +287,18 @@ if (!source.includes("coupon.status === 'candidate' &&")) {
   source = source.slice(0, start) + couponsView + source.slice(end)
 }
 
+if (!source.includes('window.__PRECO_RADAR_PRODUCTS__')) {
+  replaceOrThrow(
+    `  const groups = useMemo(() => buildGroups(data.products), [data.products])`,
+    `  const groups = useMemo(() => buildGroups(data.products), [data.products])
+
+  useEffect(() => {
+    window.__PRECO_RADAR_PRODUCTS__ = data.products || []
+    return () => { delete window.__PRECO_RADAR_PRODUCTS__ }
+  }, [data.products])`,
+    'coupon product price bridge',
+  )
+}
+
 fs.writeFileSync(file, source)
-console.log('Applied dashboard ranking, history and coupon visibility fixes.')
+console.log('Applied dashboard ranking, history and coupon savings-order fixes.')
