@@ -3,7 +3,9 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/apply-dashboard-fixes.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/apply-dashboard-fixes.mjs",
     "build": "next build",
     "start": "next start"
   },
