@@ -1,0 +1,12 @@
+(()=>{
+const DATA_URL='https://sziaumkwyxodhtuaxlhg.supabase.co/functions/v1/dashboard-data';
+let specs=new Map(),loading=false;
+function esc(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function build(products){const map=new Map();for(const p of products||[]){const key=p.group_key||p.model||p.id;if(!map.has(key))map.set(key,{key,name:p.group_name||p.name,processor:p.processor||'',ram:p.ram||'',storage:p.storage||'',gpu:p.gpu||''});else{const s=map.get(key);s.processor=s.processor||p.processor||'';s.ram=s.ram||p.ram||'';s.storage=s.storage||p.storage||'';s.gpu=s.gpu||p.gpu||''}}specs=map}
+function markup(s){return `<div class="hw-item" title="${esc(s.processor||'Não informado')}"><span>Processador</span><strong>${esc(s.processor||'—')}</strong></div><div class="hw-item"><span>RAM</span><strong>${esc(s.ram||'—')}</strong></div><div class="hw-item"><span>SSD</span><strong>${esc(s.storage||'—')}</strong></div><div class="hw-item" title="${esc(s.gpu||'Não informado')}"><span>GPU</span><strong>${esc(s.gpu||'—')}</strong></div>`}
+function applyCards(){document.querySelectorAll('.model-card[data-open-group]').forEach(card=>{const s=specs.get(card.dataset.openGroup);if(!s)return;let box=card.querySelector('.hardware-specs');if(!box){box=document.createElement('div');box.className='hardware-specs';const left=card.querySelector('.model-left');const meta=left?.querySelector('.model-meta');if(left)left.insertBefore(box,meta||null)}box.innerHTML=markup(s)})}
+function applyDetail(){const dialog=document.querySelector('#detailDialog');if(!dialog?.open)return;const title=document.querySelector('#detailName')?.textContent?.trim();if(!title)return;const s=[...specs.values()].find(x=>x.name===title);if(!s)return;let box=dialog.querySelector('.detail-hardware');if(!box){box=document.createElement('div');box.className='detail-hardware';document.querySelector('#detailSummary')?.insertAdjacentElement('afterend',box)}box.innerHTML=markup(s)}
+function apply(){applyCards();applyDetail()}
+async function refresh(){if(loading)return;loading=true;try{const r=await fetch(DATA_URL+'?specs='+Date.now(),{cache:'no-store'});if(!r.ok)return;const d=await r.json();build(d.products||[]);apply()}catch(_){ }finally{loading=false}}
+document.addEventListener('DOMContentLoaded',()=>{refresh();const root=document.querySelector('.app')||document.body;new MutationObserver(()=>apply()).observe(root,{subtree:true,childList:true,characterData:true});setInterval(refresh,60000)});
+})();
